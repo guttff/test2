@@ -1,0 +1,11 @@
+{
+  "name": "todo-app",
+  "version": "1.0.0",
+  "description": "A todo tracking application",
+  "scripts": {
+    "start": "npx serve src -l 3000",
+    "test": "node tests/todo.test.js"
+  },
+  "keywords": ["todo", "tracker"],
+  "license": "MIT"
+}
