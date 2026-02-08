@@ -67,6 +67,23 @@
         deleteTodo(todo.id);
       });
 
+      var handle = document.createElement("span");
+      handle.className = "drag-handle";
+      handle.innerHTML = "&#x2630;";
+      handle.title = "Drag to reorder";
+
+      li.draggable = true;
+      li.addEventListener("dragstart", onDragStart);
+      li.addEventListener("dragend", onDragEnd);
+      li.addEventListener("dragover", onDragOver);
+      li.addEventListener("dragenter", onDragEnter);
+      li.addEventListener("dragleave", onDragLeave);
+      li.addEventListener("drop", onDrop);
+
+      // Touch support
+      handle.addEventListener("touchstart", onTouchStart, { passive: false });
+
+      li.appendChild(handle);
       li.appendChild(checkbox);
       li.appendChild(span);
       li.appendChild(deleteBtn);
@@ -171,6 +188,128 @@
         editInput.blur();
       }
     });
+  }
+
+  // --- Drag and drop ---
+  var draggedId = null;
+
+  function onDragStart(e) {
+    draggedId = this.dataset.id;
+    this.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function onDragEnd() {
+    this.classList.remove("dragging");
+    list.querySelectorAll(".drag-over").forEach(function (el) {
+      el.classList.remove("drag-over");
+    });
+    draggedId = null;
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
+
+  function onDragEnter(e) {
+    e.preventDefault();
+    if (this.dataset.id !== draggedId) {
+      this.classList.add("drag-over");
+    }
+  }
+
+  function onDragLeave() {
+    this.classList.remove("drag-over");
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    this.classList.remove("drag-over");
+    var targetId = this.dataset.id;
+    if (draggedId && draggedId !== targetId) {
+      reorderTodos(draggedId, targetId);
+    }
+  }
+
+  function reorderTodos(fromId, toId) {
+    var fromIndex = todos.findIndex(function (t) { return t.id === fromId; });
+    var toIndex = todos.findIndex(function (t) { return t.id === toId; });
+    if (fromIndex === -1 || toIndex === -1) return;
+    var item = todos.splice(fromIndex, 1)[0];
+    todos.splice(toIndex, 0, item);
+    saveTodos();
+    render();
+  }
+
+  // --- Touch drag support ---
+  var touchDragEl = null;
+  var touchClone = null;
+  var touchStartY = 0;
+
+  function onTouchStart(e) {
+    e.preventDefault();
+    var li = this.closest(".todo-item");
+    touchDragEl = li;
+    draggedId = li.dataset.id;
+    touchStartY = e.touches[0].clientY;
+
+    touchClone = li.cloneNode(true);
+    touchClone.style.position = "fixed";
+    touchClone.style.zIndex = "1000";
+    touchClone.style.width = li.offsetWidth + "px";
+    touchClone.style.opacity = "0.85";
+    touchClone.style.pointerEvents = "none";
+    touchClone.style.left = li.getBoundingClientRect().left + "px";
+    touchClone.style.top = li.getBoundingClientRect().top + "px";
+    document.body.appendChild(touchClone);
+
+    li.classList.add("dragging");
+
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onTouchEnd);
+  }
+
+  function onTouchMove(e) {
+    e.preventDefault();
+    var touch = e.touches[0];
+    if (touchClone) {
+      touchClone.style.top = touch.clientY - 20 + "px";
+    }
+
+    var target = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (target) {
+      var targetLi = target.closest(".todo-item");
+      list.querySelectorAll(".drag-over").forEach(function (el) {
+        el.classList.remove("drag-over");
+      });
+      if (targetLi && targetLi.dataset.id !== draggedId) {
+        targetLi.classList.add("drag-over");
+      }
+    }
+  }
+
+  function onTouchEnd(e) {
+    document.removeEventListener("touchmove", onTouchMove);
+    document.removeEventListener("touchend", onTouchEnd);
+
+    var touch = e.changedTouches[0];
+    var target = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (target) {
+      var targetLi = target.closest(".todo-item");
+      if (targetLi && draggedId && targetLi.dataset.id !== draggedId) {
+        reorderTodos(draggedId, targetLi.dataset.id);
+      }
+    }
+
+    if (touchDragEl) touchDragEl.classList.remove("dragging");
+    if (touchClone) touchClone.remove();
+    list.querySelectorAll(".drag-over").forEach(function (el) {
+      el.classList.remove("drag-over");
+    });
+    touchDragEl = null;
+    touchClone = null;
+    draggedId = null;
   }
 
   // --- Event listeners ---
